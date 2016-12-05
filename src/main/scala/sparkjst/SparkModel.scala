@@ -12,7 +12,7 @@ import scala.util.Random
   */
 class SparkModel extends Serializable{
 
-  val option = new SparkJstOption
+  val option = new SparkJstLocalOption
 
   val alpha_lz = Array.ofDim[Double](option.nSentLabs, option.kTopic)
 
@@ -26,9 +26,9 @@ class SparkModel extends Serializable{
 
   val gamma_dl = new Array[Double](option.nSentLabs)
 
-  var gammaSum_d = 0.0
+  val gammaSum_d = new Array[Double](1)
 
-  def initOptionParameter(sparkJstOption: SparkJstOption): Unit ={
+  def initOptionParameter(sparkJstOption: SparkJstOption): Unit = {
     option.corpusSize = sparkJstOption.corpusSize
     option.aveDocLength = sparkJstOption.aveDocLength
     option.numDocs = sparkJstOption.numDocs
@@ -100,8 +100,10 @@ class SparkModel extends Serializable{
     if (option.gamma <= 0 ) {
       option.gamma = option.aveDocLength * 0.05 / option.nSentLabs.toDouble
     }
+    gammaSum_d(0) = 0.0
     for(l <- 0 until option.nSentLabs){
-      gammaSum_d += gamma_dl(l)
+      gamma_dl(l) = option.gamma
+      gammaSum_d(0) += gamma_dl(l)
     }
 
   }
@@ -178,7 +180,7 @@ class SparkModel extends Serializable{
       for( l <- 0 until option.nSentLabs){
         for( z <- 0 until option.kTopic){
           p(l)(z) = (nlzw(l)(z)(word) + beta_lzw(l)(z)(word))/(nlz(l)(z) + betaSum_lz(l)(z)) *
-            (ndlz(l)(z) + alpha_lz(l)(z)) / (ndl(l) + alphaSum_l(l)) * (ndl(l) + gamma_dl(l)) / (nd(0) + gammaSum_d)
+            (ndlz(l)(z) + alpha_lz(l)(z)) / (ndl(l) + alphaSum_l(l)) * (ndl(l) + gamma_dl(l)) / (nd(0) + gammaSum_d(0))
         }
       }
 
@@ -292,7 +294,7 @@ class SparkModel extends Serializable{
     resultDocuments.map(doc => {
       val pi_dl = new Array[Double](option.nSentLabs)
       for(l <- 0 until option.nSentLabs){
-        pi_dl(l) = (doc._3(l) + gamma_dl(l))/(doc._2(0) + gammaSum_d)
+        pi_dl(l) = (doc._3(l) + gamma_dl(l))/(doc._2(0) + gammaSum_d(0))
       }
       (doc._1, pi_dl)
     }).map(l => {
@@ -321,7 +323,6 @@ class SparkModel extends Serializable{
       }
       str
     }).saveAsTextFile(option.thetaOutput)
-
 
     //save phi
     val phi_lzw = new ArrayBuffer[(Int, Int, Array[Double])]
@@ -362,9 +363,16 @@ class SparkModel extends Serializable{
       var ll = 0
       var topic = 0
       val nd = Array[Int](1)
+      nd(0) = 0
       val ndl = new Array[Int](option.nSentLabs)
+      for(i <- 0 until option.nSentLabs) {ndl(i) = 0}
       val ndlz = Array.ofDim[Int](option.nSentLabs, option.kTopic)
-      val sentTopicAssignArray = new Array[(Int, Int, Int)](p.length - 1)//(word, sent, topic)
+      for(i <- 0 until option.nSentLabs){
+        for(j <- 0 until option.kTopic){
+          ndlz(i)(j) = 0
+        }
+      }
+      val sentTopicAssignArray = new Array[(Int, Int, Int)](p.length - 1)//(sent, topic, word)
       for(i <- 1 until p.length){
         val item = p(i).split(" ")
         if(item(1).toInt > -1 && item(1).toInt < option.nSentLabs){

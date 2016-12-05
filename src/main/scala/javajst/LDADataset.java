@@ -222,41 +222,7 @@ public class LDADataset {
 			e.printStackTrace();
 		}		
 	}
-	
-	/*public void read_wordmap(String filename, Map<String, Integer> word2id){
-		try{
-			BufferedReader reader = new BufferedReader(new InputStreamReader(
-					new FileInputStream(filename), "UTF-8"));
-			String line;
-			
-			//read the number of words
-			line = reader.readLine();			
-			int nwords = Integer.parseInt(line);
-			
-			//read map
-			for (int i = 0; i < nwords; ++i){
-				line = reader.readLine();
-				StringTokenizer tknr = new StringTokenizer(line, " \t\n\r");
-				
-				if (tknr.countTokens() != 2) continue;
-				
-				String word = tknr.nextToken();
-				String id = tknr.nextToken();
-				int intID = Integer.parseInt(id);
-				
-				word2id.put(word, intID);
-			}
-			
-			reader.close();
-		}
-		catch (Exception e){
-			System.out.println("Error while reading dictionary:" + e.getMessage());
-			e.printStackTrace();
-		}		
-	}*/
-	
-	
-	
+
 	public void read_senti_lexicon(String filename){
 		try {
 			BufferedReader reader = new BufferedReader(new InputStreamReader(

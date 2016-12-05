@@ -109,7 +109,7 @@ public class Model implements Serializable{
 		others_suffix = ".others";
 		twords_suffix = ".twords";
 		
-		numTopics = 50;
+		numTopics = 10;
 		numSentiLabs = 3;
 		vocabSize = 0;
 		numDocs = 0;
@@ -231,35 +231,13 @@ public class Model implements Serializable{
 		p = new double[numSentiLabs][numTopics];
 
 		// model parameters
-		/*pi_dl.resize(numDocs);
-		for (int m = 0; m < numDocs; m++) {
-			pi_dl[m].resize(numSentiLabs);
-		}*/
 		pi_dl = new double[numDocs][numSentiLabs];
 
-		/*theta_dlz.resize(numDocs);
-		for (int m = 0; m < numDocs; m++) {
-			theta_dlz[m].resize(numSentiLabs);
-			for (int l = 0; l < numSentiLabs; l++) {
-				theta_dlz[m][l].resize(numTopics);
-			}
-		}*/
 		theta_dlz = new double[numDocs][numSentiLabs][numTopics];
 
-		/*phi_lzw.resize(numSentiLabs);
-		for (int l = 0; l < numSentiLabs; l++) {
-			phi_lzw[l].resize(numTopics);
-			for (int z = 0; z < numTopics; z++) {
-				phi_lzw[l][z].resize(vocabSize);
-			}
-		}*/
 		phi_lzw = new double[numSentiLabs][numTopics][vocabSize];
 
 		// init hyperparameters
-		/*alpha_lz.resize(numSentiLabs);
-		for (int l = 0; l < numSentiLabs; l++) {
-			alpha_lz[l].resize(numTopics);
-		}*/
 		alpha_lz = new double[numSentiLabs][numTopics];
 
 		//alphaSum_l.resize(numSentiLabs);
@@ -277,38 +255,27 @@ public class Model implements Serializable{
 		    }
 		}
 
-		/*opt_alpha_lz.resize(numSentiLabs);
-		for (int l = 0; l < numSentiLabs; l++) {
-			opt_alpha_lz[l].resize(numTopics);
-		}*/
 		opt_alpha_lz = new double[numSentiLabs][numTopics];
 
 		//beta
 		if (_beta <= 0) _beta = 0.01;
 
-		//beta_lzw.resize(numSentiLabs);
-		//betaSum_lz.resize(numSentiLabs);
-		beta_lzw = new double[numSentiLabs][numTopics][];
+		beta_lzw = new double[numSentiLabs][numTopics][vocabSize];
 		betaSum_lz = new double[numSentiLabs][numTopics];
 		for (int l = 0; l < numSentiLabs; l++) {
-			//beta_lzw[l].resize(numTopics);
-			//betaSum_lz[l].resize(numTopics);
 			for (int z = 0; z < numTopics; z++) {
 				betaSum_lz[l][z] = 0.0;
-				//beta_lzw[l][z].resize(vocabSize);
 				for (int r = 0; r < vocabSize; r++) {
 					beta_lzw[l][z][r] = _beta;
 				}
-			} 		
+			}
 		}
 
-		// word prior transformation matrix
-		//lambda_lw.resize(numSentiLabs);
 		lambda_lw = new double[numSentiLabs][vocabSize];
 		for (int l = 0; l < numSentiLabs; l++) {
 		    //lambda_lw[l].resize(vocabSize);
 			for (int r = 0; r < vocabSize; r++) {
-				lambda_lw[l][r] = 1.0; 	
+				lambda_lw[l][r] = 1.0;
 			}
 		}
 

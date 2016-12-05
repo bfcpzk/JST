@@ -16,7 +16,7 @@ public class main {
 		option.datasetFile = "data/MR.txt";
 		option.result_dir = "data/";
 		option.sentiLexFile = "data/mpqa.constraint";
-		option.wordMapFileName = "wordmap";
+		option.wordMapFileName = "data/wordmap.txt";
 		
 		option.modelName = "model_final";
 		
