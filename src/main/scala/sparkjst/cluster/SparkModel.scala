@@ -1,41 +1,18 @@
-package sparkjst
+package sparkjst.cluster
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.storage.StorageLevel
-import org.apache.spark.{SparkContext, SparkConf}
+import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
 /**
-  * Created by zhaokangpan on 2016/11/22.
+  * Created by zhaokangpan on 2016/12/6.
   */
-class SparkModel extends Serializable{
+object SparkModel {
 
-  val option = new SparkJstLocalOption
-
-  val alpha_lz = Array.ofDim[Double](option.nSentLabs, option.kTopic)
-
-  val alphaSum_l = new Array[Double](option.nSentLabs)
-
-  val beta_lzw = Array.ofDim[Double](option.nSentLabs, option.kTopic, option.vocabSize)
-
-  val betaSum_lz = Array.ofDim[Double](option.nSentLabs, option.kTopic)
-
-  val lambda_lw = Array.ofDim[Double](option.nSentLabs, option.vocabSize)
-
-  val gamma_dl = new Array[Double](option.nSentLabs)
-
-  val gammaSum_d = new Array[Double](1)
-
-  def initOptionParameter(sparkJstOption: SparkJstOption): Unit = {
-    option.corpusSize = sparkJstOption.corpusSize
-    option.aveDocLength = sparkJstOption.aveDocLength
-    option.numDocs = sparkJstOption.numDocs
-    option.vocabSize = sparkJstOption.vocabSize
-  }
-
-  def prior2beta(sc : SparkContext): Unit = {
+  def prior2beta(sc : SparkContext, option: SparkJstOption, coefficient: Coefficient): Unit = {
     val indexSentPos = sc.textFile(option.indexSentPos).map(l => {
       val p = l.split("\t")
       (p(0).toInt, p(1).toInt)
@@ -45,32 +22,32 @@ class SparkModel extends Serializable{
       val index = item._1
       val pos = item._2
       if(pos != -1){
-        lambda_lw(pos)(index) = 1
+        coefficient.lambda_lw(pos)(index) = 1
       }
     }
 
     for(l <- 0 until option.nSentLabs){
       for(z <- 0 until option.kTopic){
-        betaSum_lz(l)(z) = 0.0
+        coefficient.betaSum_lz(l)(z) = 0.0
         for(w <- 0 until option.vocabSize){
-          beta_lzw(l)(z)(w) = beta_lzw(l)(z)(w) * lambda_lw(l)(w)
-          betaSum_lz(l)(z) += beta_lzw(l)(z)(w)
+          coefficient.beta_lzw(l)(z)(w) = coefficient.beta_lzw(l)(z)(w) * coefficient.lambda_lw(l)(w)
+          coefficient.betaSum_lz(l)(z) += coefficient.beta_lzw(l)(z)(w)
         }
       }
     }
   }
 
-  def initCoff(sc : SparkContext): Unit = {
+  def initCoff(sc : SparkContext, option : SparkJstOption, coefficient : Coefficient): Coefficient = {
 
     //处理alpha
     if (option.alpha <= 0) {
       option.alpha = option.aveDocLength * 0.05 / (option.nSentLabs * option.kTopic).toDouble
     }
     for( l <- 0 until option.nSentLabs){
-      alphaSum_l(l) = 0.0
+      coefficient.alphaSum_l(l) = 0.0
       for( z <- 0 until option.kTopic){
-        alpha_lz(l)(z) = option.alpha
-        alphaSum_l(l) += alpha_lz(l)(z)
+        coefficient.alpha_lz(l)(z) = option.alpha
+        coefficient.alphaSum_l(l) += coefficient.alpha_lz(l)(z)
       }
     }
 
@@ -79,9 +56,9 @@ class SparkModel extends Serializable{
     if (option.beta <= 0) option.beta = 0.01
     for( l <- 0 until option.nSentLabs){
       for( z <- 0 until option.kTopic){
-        betaSum_lz(l)(z) = 0.0
+        coefficient.betaSum_lz(l)(z) = 0.0
         for( r <- 0 until option.vocabSize){
-          beta_lzw(l)(z)(r) = option.beta
+          coefficient.beta_lzw(l)(z)(r) = option.beta
         }
       }
     }
@@ -89,23 +66,23 @@ class SparkModel extends Serializable{
     //初始化lamada
     for(l <- 0 until option.nSentLabs){
       for(w <- 0 until option.vocabSize){
-        lambda_lw(l)(w) = 1.0
+        coefficient.lambda_lw(l)(w) = 1.0
       }
     }
 
     //更新beta
-    prior2beta(sc)
+    prior2beta(sc, option, coefficient)
 
     //初始化gamma
     if (option.gamma <= 0 ) {
       option.gamma = option.aveDocLength * 0.05 / option.nSentLabs.toDouble
     }
-    gammaSum_d(0) = 0.0
+    coefficient.gammaSum_d(0) = 0.0
     for(l <- 0 until option.nSentLabs){
-      gamma_dl(l) = option.gamma
-      gammaSum_d(0) += gamma_dl(l)
+      coefficient.gamma_dl(l) = option.gamma
+      coefficient.gammaSum_d(0) += coefficient.gamma_dl(l)
     }
-
+    coefficient
   }
 
   // 启动spark集群
@@ -138,7 +115,7 @@ class SparkModel extends Serializable{
     sparkContext
   }
 
-  def updateNlzw(sentTopicTerm: List[((Int, Int, Int), Int)]) = {
+  def updateNlzw(sentTopicTerm: List[((Int, Int, Int), Int)], option: SparkJstOption) = {
     val nlzw = Array.ofDim[Int](option.nSentLabs, option.kTopic, option.vocabSize)
     sentTopicTerm.foreach( t => {
       val sent = t._1._1
@@ -150,7 +127,7 @@ class SparkModel extends Serializable{
     nlzw
   }
 
-  def updateNlz(sentTopicTerm: List[((Int, Int, Int), Int)]) = {
+  def updateNlz(sentTopicTerm: List[((Int, Int, Int), Int)], option : SparkJstOption) = {
     val nlz = Array.ofDim[Int](option.nSentLabs, option.kTopic)
     sentTopicTerm.foreach(t => {
       val sent = t._1._1
@@ -161,7 +138,13 @@ class SparkModel extends Serializable{
     nlz
   }
 
-  def gibbsSampling(sentTopicAssignArray : Array[(Int, Int, Int)], nd : Array[Int], ndl : Array[Int], ndlz : Array[Array[Int]], nlzw : Array[Array[Array[Int]]], nlz : Array[Array[Int]]) = {
+  def gibbsSampling(sentTopicAssignArray : Array[(Int, Int, Int)], nd : Array[Int],
+                    ndl : Array[Int],
+                    ndlz : Array[Array[Int]],
+                    nlzw : Array[Array[Array[Int]]],
+                    nlz : Array[Array[Int]],
+                    option : SparkJstOption,
+                    coefficient: Coefficient) = {
     for(t <- 0 until sentTopicAssignArray.length){
       var sentLab = sentTopicAssignArray(t)._1
       var topic = sentTopicAssignArray(t)._2
@@ -179,8 +162,8 @@ class SparkModel extends Serializable{
 
       for( l <- 0 until option.nSentLabs){
         for( z <- 0 until option.kTopic){
-          p(l)(z) = (nlzw(l)(z)(word) + beta_lzw(l)(z)(word))/(nlz(l)(z) + betaSum_lz(l)(z)) *
-            (ndlz(l)(z) + alpha_lz(l)(z)) / (ndl(l) + alphaSum_l(l)) * (ndl(l) + gamma_dl(l)) / (nd(0) + gammaSum_d(0))
+          p(l)(z) = (nlzw(l)(z)(word) + coefficient.beta_lzw(l)(z)(word))/(nlz(l)(z) + coefficient.betaSum_lz(l)(z)) *
+            (ndlz(l)(z) + coefficient.alpha_lz(l)(z)) / (ndl(l) + coefficient.alphaSum_l(l)) * (ndl(l) + coefficient.gamma_dl(l)) / (nd(0) + coefficient.gammaSum_d(0))
         }
       }
 
@@ -225,11 +208,14 @@ class SparkModel extends Serializable{
     (sentTopicAssignArray, nd, ndl, ndlz)
   }
 
-
-
-  def execEstimate(sc : SparkContext, iterInputDocuments : RDD[(String, Array[Int], Array[Int], Array[Array[Int]], Array[(Int, Int, Int)])], nlzw : Array[Array[Array[Int]]], nlz : Array[Array[Int]]): Unit ={
+  def execEstimate(sc : SparkContext,
+                   iterInputDocuments : RDD[(String, Array[Int], Array[Int], Array[Array[Int]], Array[(Int, Int, Int)])],
+                   nlzw : Array[Array[Array[Int]]],
+                   nlz : Array[Array[Int]],
+                   option: SparkJstOption,
+                   coefficient: Coefficient): Unit ={
+    var scc = sc
     var updateDocuments = iterInputDocuments
-    //updateDocuments.collect().foreach(l => print(l._1))
     var iterTrainDoc = iterInputDocuments
     var nlzwTmp = nlzw
     var nlzTmp = nlz
@@ -237,18 +223,18 @@ class SparkModel extends Serializable{
       updateDocuments = iterTrainDoc.map {
         case (docId, nd, ndl, ndlz, sentTopicAssignArray) =>
           //gibbs sampling
-          val (newSentTopicAssignArray, new_nd, new_ndl, new_ndlz) = gibbsSampling(sentTopicAssignArray, nd, ndl, ndlz, nlzwTmp, nlzTmp)
+          val (newSentTopicAssignArray, new_nd, new_ndl, new_ndlz) = gibbsSampling(sentTopicAssignArray, nd, ndl, ndlz, nlzwTmp, nlzTmp, option, coefficient)
           (docId, new_nd, new_ndl, new_ndlz, newSentTopicAssignArray)
       }
 
       val sentTopicReduce = updateDocuments.flatMap(l => l._5).map(t => (t, 1)).reduceByKey(_+_).collect().toList
 
-      //释放资源
+      //release resource
       iterTrainDoc.unpersist(blocking = false)
       iterTrainDoc = updateDocuments
 
-      nlzwTmp = updateNlzw(sentTopicReduce)
-      nlzTmp = updateNlz(sentTopicReduce)
+      nlzwTmp = updateNlzw(sentTopicReduce, option)
+      nlzTmp = updateNlz(sentTopicReduce, option)
 
       println("iteration " + iter + " finished")
 
@@ -258,8 +244,8 @@ class SparkModel extends Serializable{
         var pathDocument1=""
         var pathDocument2=""
         if(option.remote){
-          pathDocument1="hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/gibbsLDAtmp_final_" + option.kTopic + "_" + iter
-          pathDocument2="hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/gibbsLDAtmp2_final_" + option.kTopic + "_" + iter
+          pathDocument1="hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/temp/gibbsLDAtmp_final_" + option.kTopic + "_" + iter
+          pathDocument2="hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/temp/gibbsLDAtmp2_final_" + option.kTopic + "_" + iter
         }else{
           pathDocument1="gibbsLDAtmp_" + iter
           pathDocument2="gibbsLDAtmp2_" + iter
@@ -272,29 +258,34 @@ class SparkModel extends Serializable{
         storedDocuments2.saveAsObjectFile(pathDocument2)
 
         //restart Spark to solve the memory leak problem
-        val sc1 = restartSpark(sc, option.remote)
+        scc = restartSpark(scc, option.remote)
         //as the restart of Spark, all of RDD are cleared
         //we need to read files in order to rebuild RDD
-        iterTrainDoc = sc1.objectFile(pathDocument1)
-        updateDocuments = sc1.objectFile(pathDocument2)
+        iterTrainDoc = scc.objectFile(pathDocument1)
+        updateDocuments = scc.objectFile(pathDocument2)
 
       }
     }
-
     //save result
     val resultDocuments = iterTrainDoc
-    saveResult(sc, resultDocuments, nlzw, nlz)
-    resultDocuments.unpersist(blocking = false)
-
+    saveResult(sc, resultDocuments, nlzw, nlz, option, coefficient)
   }
 
-  def saveResult(sc : SparkContext, resultDocuments : RDD[(String, Array[Int], Array[Int], Array[Array[Int]], Array[(Int, Int, Int)])], nlzw : Array[Array[Array[Int]]], nlz : Array[Array[Int]]){
+  def saveResult(sc : SparkContext,
+                 resultDocuments : RDD[(String, Array[Int], Array[Int], Array[Array[Int]], Array[(Int, Int, Int)])],
+                 nlzw : Array[Array[Array[Int]]],
+                 nlz : Array[Array[Int]],
+                 option: SparkJstOption,
+                 coefficient: Coefficient){
+
+    //move to memory
+    resultDocuments.cache()
 
     //save pi
     resultDocuments.map(doc => {
       val pi_dl = new Array[Double](option.nSentLabs)
       for(l <- 0 until option.nSentLabs){
-        pi_dl(l) = (doc._3(l) + gamma_dl(l))/(doc._2(0) + gammaSum_d(0))
+        pi_dl(l) = (doc._3(l) + coefficient.gamma_dl(l))/(doc._2(0) + coefficient.gammaSum_d(0))
       }
       (doc._1, pi_dl)
     }).map(l => {
@@ -311,7 +302,7 @@ class SparkModel extends Serializable{
       for(l <- 0 until option.nSentLabs){
         val theta_dlz = new Array[Double](option.kTopic)
         for(z <- 0 until option.kTopic){
-          theta_dlz(z) = (doc._4(l)(z) + alpha_lz(l)(z))/(doc._3(l) + alphaSum_l(l))
+          theta_dlz(z) = (doc._4(l)(z) + coefficient.alpha_lz(l)(z))/(doc._3(l) + coefficient.alphaSum_l(l))
         }
         result(l) = (doc._1, l, theta_dlz)
       }
@@ -330,7 +321,7 @@ class SparkModel extends Serializable{
       for( z <- 0 until option.kTopic){
         val wordSentTopic = new Array[Double](option.vocabSize)
         for( w <- 0 until option.vocabSize){
-          wordSentTopic(w) = (nlzw(l)(z)(w) + beta_lzw(l)(z)(w)) / (nlz(l)(z) + betaSum_lz(l)(z))
+          wordSentTopic(w) = (nlzw(l)(z)(w) + coefficient.beta_lzw(l)(z)(w)) / (nlz(l)(z) + coefficient.betaSum_lz(l)(z))
         }
         phi_lzw.+=((l, z, wordSentTopic))
       }
@@ -346,16 +337,16 @@ class SparkModel extends Serializable{
   }
 
 
-  def initEstimate(): Unit ={
+  def initEstimate(option: SparkJstOption, coefficient: Coefficient): Unit ={
 
-    //启动集群
+    //start spark
     System.setProperty("file.encoding", "UTF-8")
-    val sc = startSpark(false)
+    val sc = startSpark(option.remote)
 
-    //初始化参数
-    initCoff(sc)
+    //init coeffcient
+    val newCoeff = initCoff(sc, option, coefficient)
 
-    //读取训练数据
+    //read training data
     val trainDoc = sc.textFile(option.numerTrainFile).map(line => {
       val p = line.split("\t")
       val z = new Array[Int](p.length - 1)
@@ -391,14 +382,50 @@ class SparkModel extends Serializable{
       (p(0), nd, ndl, ndlz, sentTopicAssignArray)
     }).cache()
 
-    //计算nlzw, nlz
+    //calculate nlzw, nlz
     val sentTopicReduce = trainDoc.flatMap(l => l._5).map(t => (t, 1)).reduceByKey(_+_).collect().toList
-    val nlzw = updateNlzw(sentTopicReduce)
-    val nlz = updateNlz(sentTopicReduce)
+    val nlzw = updateNlzw(sentTopicReduce, option)
+    val nlz = updateNlz(sentTopicReduce, option)
 
     val iterInputDocuments = trainDoc
 
-    execEstimate(sc, iterInputDocuments, nlzw, nlz)
+    //release resource
+    trainDoc.unpersist(blocking = false)
 
+    execEstimate(sc, iterInputDocuments, nlzw, nlz, option, newCoeff)
+
+  }
+
+  //coeffecient class
+  case class Coefficient(alpha_lz : Array[Array[Double]],
+                         alphaSum_l : Array[Double],
+                         beta_lzw : Array[Array[Array[Double]]],
+                         betaSum_lz : Array[Array[Double]],
+                         lambda_lw : Array[Array[Double]],
+                         gamma_dl : Array[Double],
+                         gammaSum_d : Array[Double])
+
+
+  def main(args : Array[String]): Unit ={
+
+    val option = new SparkJstOption
+
+    val alpha_lz = Array.ofDim[Double](option.nSentLabs, option.kTopic)
+
+    val alphaSum_l = new Array[Double](option.nSentLabs)
+
+    val beta_lzw = Array.ofDim[Double](option.nSentLabs, option.kTopic, option.vocabSize)
+
+    val betaSum_lz = Array.ofDim[Double](option.nSentLabs, option.kTopic)
+
+    val lambda_lw = Array.ofDim[Double](option.nSentLabs, option.vocabSize)
+
+    val gamma_dl = new Array[Double](option.nSentLabs)
+
+    val gammaSum_d = new Array[Double](1)
+
+    val coefficient = Coefficient(alpha_lz, alphaSum_l, beta_lzw, betaSum_lz, lambda_lw, gamma_dl, gammaSum_d)
+    //program start
+    initEstimate(option, coefficient)
   }
 }

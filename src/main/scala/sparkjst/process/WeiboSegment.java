@@ -1,4 +1,4 @@
-package sparkjst;
+package sparkjst.process;
 
 import com.hankcs.hanlp.HanLP;
 import com.hankcs.hanlp.dictionary.CustomDictionary;

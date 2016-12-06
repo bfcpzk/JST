@@ -1,4 +1,4 @@
-package sparkjst;
+package sparkjst.local;
 
 import java.io.Serializable;
 
@@ -7,9 +7,10 @@ import java.io.Serializable;
  */
 public class SparkJstLocalOption implements Serializable{
 
-    public String trainFile = "data/MR.txt";
+    public String trainFile = "data/testWeibo.txt";
     public String numerTrainFile = "data/numerTrainFile";
-    public String sentDict = "data/mpqa.constraint";
+    public String sentDict = "data/sentiNonDup.txt";
+    public String wordMap = "data/wordMap";
     public String numerSentDict = "data/numerSentDict";
     public String dataCoeff = "data/dataCoeff";
     public int kTopic = 10;
@@ -26,9 +27,9 @@ public class SparkJstLocalOption implements Serializable{
 
     public String indexSentPos = "data/indexSentPos";
 
-    public int numDocs = 9;
-    public int vocabSize = 13;
-    public int corpusSize = 108;
-    public double aveDocLength = 12.0;
+    public int numDocs = 520;
+    public int vocabSize = 3134;
+    public int corpusSize = 8450;
+    public double aveDocLength = 16.25;
 
 }

@@ -1,14 +1,13 @@
-package sparkjst
+package sparkjst.local
 
-import org.apache.spark.{SparkContext, SparkConf}
+import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.collection.mutable.{ArrayBuffer, HashMap}
 
 /**
-  * Created by zhaokangpan on 2016/11/21.
+  * Created by zhaokangpan on 2016/12/6.
   */
-class SparkFilePreProcess {
-
+object SparkLocalPreProcess {
   //start spark
   def startSpark(remote: Boolean) = {
     var scMaster = ""
@@ -17,13 +16,13 @@ class SparkFilePreProcess {
     } else {
       scMaster = "local[4]" // e.g. local[4]
     }
-    val conf = new SparkConf().setAppName("SparkFilePreProcess").setMaster(scMaster)
+    val conf = new SparkConf().setAppName("SparkLocalPreProcess").setMaster(scMaster)
     val sparkContext = new SparkContext(conf)
     sparkContext
   }
 
   //save (word, index) dictionary
-  def saveWordIndexMap( sc: SparkContext, wordMap : HashMap[String, Int], option: SparkJstOption): Unit ={
+  def saveWordIndexMap( sc: SparkContext, wordMap : HashMap[String, Int], option: SparkJstLocalOption): Unit ={
     val wordArray = new ArrayBuffer[String]()
     for(item <- wordMap){
       wordArray.+=(item._2 + " " + item._1)
@@ -32,21 +31,22 @@ class SparkFilePreProcess {
   }
 
   //process
-  def jstFileProcess(option : SparkJstOption){
+  def jstFileProcess(option : SparkJstLocalOption){
     //start spark
     System.setProperty("file.encoding", "UTF-8")
     val sc = startSpark(option.remote)
 
     //read sentiment dictionary and training corpus
-    val docSize = sc.textFile(option.trainFile).count.toInt
-    val corpusSize = sc.textFile(option.trainFile).flatMap(l => {
-      val p = l.split("\t|\r|\n| ")
-      for(i <- 1 until p.length) yield ("word", 1)
+    val trainFile = sc.textFile(option.trainFile).cache()
+    val docSize = trainFile.count.toInt
+    val corpusSize = trainFile.filter(l => l.split("\t").length == 4).flatMap(l => {
+      val p = l.split("\t")(3).split(" ")
+      for(i <- 0 until p.length) yield ("word", 1)
     }).reduceByKey(_+_).map(l => l._2).collect()(0)
 
-    val allWords = sc.textFile(option.trainFile).flatMap(l => {
-      val p = l.split("\t|\r|\n| ")
-      for(i <- 1 until p.length) yield p(i)
+    val allWords = trainFile.filter(l => l.split("\t").length == 4).flatMap(l => {
+      val p = l.split("\t")(3).split(" ")
+      for(i <- 0 until p.length) yield p(i)
     }).distinct.collect().toList.sortWith(_ < _)
 
     //calculate the parameters
@@ -56,6 +56,7 @@ class SparkFilePreProcess {
     //save the parameters
     sc.parallelize(List(docSize + " " + vSize + " " + corpusSize + " " + avgDocSize), numSlices = 1).saveAsTextFile(option.dataCoeff)
 
+    //create dictionary
     val wordIndexMap = new HashMap[String, Int]()
     for (i <- 0 until vSize) {
       wordIndexMap(allWords(i)) = i
@@ -66,7 +67,7 @@ class SparkFilePreProcess {
 
     //read sentiment dictionary
     val sentDict = sc.textFile(option.sentDict).map(l => {
-      val p = l.split("\t| ")
+      val p = l.split("\t")
       var tmp_sent_pos = 1
       var sent_val = 0.0
       for(i <- 1 to 3){
@@ -75,7 +76,7 @@ class SparkFilePreProcess {
           tmp_sent_pos = i - 1
         }
       }
-      (p(0), tmp_sent_pos)
+      (p(0).trim, tmp_sent_pos)
     })
 
     //calculate lamda
@@ -85,20 +86,26 @@ class SparkFilePreProcess {
     }
     sc.parallelize(index).leftOuterJoin(sentDict).map(l => {
       (l._2._1, l._2._2.getOrElse(-1))//(index, sentPos)
-    }).map(l => l._1 + "\t" + l._2).saveAsTextFile(option.indexSentPos)
-
+    }).map(l => l._1 + "\t" + l._2).repartition(1).saveAsTextFile(option.indexSentPos)
 
     //transform the format of training corpus
-    sc.textFile(option.trainFile).flatMap(l => {
-      val p = l.split("\t|\n|\r| ")
-      for(i <- 1 until p.length) yield (p(i), p(0))
-    }).leftOuterJoin(sentDict).map(l => (l._2._1, (wordIndexMap(l._1), l._2._2.getOrElse(-1)))).groupByKey().map(l => {
+    trainFile.filter(l => l.split("\t").length == 4).flatMap(l => {
+      val p = l.split("\t")
+      val word = p(3).split(" ")
+      for(i <- 1 until word.length) yield (word(i), (p(0), p(2)))//(word, (weiboid, userid))
+    }).leftOuterJoin(sentDict).map(l => (l._2._1, (wordIndexMap(l._1).toString, l._2._2.getOrElse("-1")))).groupByKey().map(l => {
       val list = l._2
-      var result = l._1
+      var result = l._1._2
       for(item <- list) {
         result += "\t" + item._1 + " " + item._2
       }
       result
-    }).saveAsTextFile(option.numerTrainFile)
+    }).saveAsTextFile(option.numerTrainFile)//result wid  wordindex1 senti1 wordindex2 senti2
+  }
+
+
+  def main(args : Array[String]): Unit ={
+    val option = new SparkJstLocalOption
+    jstFileProcess(option)
   }
 }
