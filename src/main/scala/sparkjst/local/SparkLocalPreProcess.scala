@@ -92,15 +92,15 @@ object SparkLocalPreProcess {
     trainFile.filter(l => l.split("\t").length == 4).flatMap(l => {
       val p = l.split("\t")
       val word = p(3).split(" ")
-      for(i <- 1 until word.length) yield (word(i), (p(0), p(2)))//(word, (weiboid, userid))
+      for(i <- 1 until word.length) yield (word(i), (p(1), p(2)))//(word, (weiboid, userid))
     }).leftOuterJoin(sentDict).map(l => (l._2._1, (wordIndexMap(l._1).toString, l._2._2.getOrElse("-1")))).groupByKey().map(l => {
       val list = l._2
-      var result = l._1._2
+      var result = l._1._2 + "\t" + l._1._1
       for(item <- list) {
         result += "\t" + item._1 + " " + item._2
       }
       result
-    }).saveAsTextFile(option.numerTrainFile)//result wid  wordindex1 senti1 wordindex2 senti2
+    }).saveAsTextFile(option.numerTrainFile)//result uid  wid  wordindex1 senti1  wordindex2 senti2
   }
 
 

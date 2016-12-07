@@ -217,7 +217,7 @@ object SparkLocalModel {
     (sentTopicAssignArray, nd, ndl, ndlz)
   }
 
-  def execEstimate(sc : SparkContext, iterInputDocuments : RDD[(String, Array[Int], Array[Int], Array[Array[Int]], Array[(Int, Int, Int)])], nlzw : Array[Array[Array[Int]]], nlz : Array[Array[Int]]): Unit ={
+  def execEstimate(sc : SparkContext, iterInputDocuments : RDD[(String, Array[Int], Array[Int], Array[Array[Int]], Array[(Int, Int, Int)], String)], nlzw : Array[Array[Array[Int]]], nlz : Array[Array[Int]]): Unit ={
     var updateDocuments = iterInputDocuments
     //updateDocuments.collect().foreach(l => print(l._1))
     var iterTrainDoc = iterInputDocuments
@@ -225,10 +225,10 @@ object SparkLocalModel {
     var nlzTmp = nlz
     for(iter <- 1 until option.maxIter){
       updateDocuments = iterTrainDoc.map {
-        case (docId, nd, ndl, ndlz, sentTopicAssignArray) =>
+        case (docId, nd, ndl, ndlz, sentTopicAssignArray, userId) =>
           //gibbs sampling
           val (newSentTopicAssignArray, new_nd, new_ndl, new_ndlz) = gibbsSampling(sentTopicAssignArray, nd, ndl, ndlz, nlzwTmp, nlzTmp)
-          (docId, new_nd, new_ndl, new_ndlz, newSentTopicAssignArray)
+          (docId, new_nd, new_ndl, new_ndlz, newSentTopicAssignArray, userId)
       }
 
       val sentTopicReduce = updateDocuments.flatMap(l => l._5).map(t => (t, 1)).reduceByKey(_+_).collect().toList
@@ -278,7 +278,7 @@ object SparkLocalModel {
 
   }
 
-  def saveResult(sc : SparkContext, resultDocuments : RDD[(String, Array[Int], Array[Int], Array[Array[Int]], Array[(Int, Int, Int)])], nlzw : Array[Array[Array[Int]]], nlz : Array[Array[Int]]){
+  def saveResult(sc : SparkContext, resultDocuments : RDD[(String, Array[Int], Array[Int], Array[Array[Int]], Array[(Int, Int, Int)], String)], nlzw : Array[Array[Array[Int]]], nlz : Array[Array[Int]]){
 
     //save pi
     resultDocuments.map(doc => {
@@ -286,10 +286,10 @@ object SparkLocalModel {
       for(l <- 0 until option.nSentLabs){
         pi_dl(l) = (doc._3(l) + gamma_dl(l))/(doc._2(0) + gammaSum_d(0))
       }
-      (doc._1, pi_dl)
+      (doc._1, doc._6, pi_dl)
     }).map(l => {
-      var str = l._1
-      for(t <- l._2){
+      var str = l._1 + "\t" + l._2
+      for(t <- l._3){
         str += "\t" + t
       }
       str
@@ -297,39 +297,38 @@ object SparkLocalModel {
 
     //save theta
     resultDocuments.flatMap( doc => {
-      val result = new Array[(String, Int, Array[Double])](option.nSentLabs)
+      val result = new Array[(String, String, Int, Array[Double])](option.nSentLabs)
       for(l <- 0 until option.nSentLabs){
         val theta_dlz = new Array[Double](option.kTopic)
         for(z <- 0 until option.kTopic){
           theta_dlz(z) = (doc._4(l)(z) + alpha_lz(l)(z))/(doc._3(l) + alphaSum_l(l))
         }
-        result(l) = (doc._1, l, theta_dlz)
+        result(l) = (doc._1, doc._6, l, theta_dlz)
       }
       result
     }).map(line => {
-      var str = line._1 + "\t" + line._2
-      for(t <- line._3){
+      var str = line._1 + "\t" + line._2 + "\t" + line._3
+      for(t <- line._4){
         str += "\t" + t
       }
       str
     }).saveAsTextFile(option.thetaOutput)
 
     //save phi
-    val phi_lzw = new ArrayBuffer[(Int, Int, Array[Double])]
+    val phi_lzw = new ArrayBuffer[(Int, Int, Int, Double)]
     for(l <- 0 until option.nSentLabs){
       for( z <- 0 until option.kTopic){
-        val wordSentTopic = new Array[Double](option.vocabSize)
+        var wordSentTopic = 0.0
         for( w <- 0 until option.vocabSize){
-          wordSentTopic(w) = (nlzw(l)(z)(w) + beta_lzw(l)(z)(w)) / (nlz(l)(z) + betaSum_lz(l)(z))
+          wordSentTopic = (nlzw(l)(z)(w) + beta_lzw(l)(z)(w)) / (nlz(l)(z) + betaSum_lz(l)(z))
+          if(wordSentTopic > 0.0001){
+            phi_lzw.+=((l, z, w, wordSentTopic))
+          }
         }
-        phi_lzw.+=((l, z, wordSentTopic))
       }
     }
     sc.parallelize(phi_lzw).map(line => {
-      var str = line._1 + "\t" + line._2
-      for(item <- line._3){
-        str += "\t" + item
-      }
+      val str = line._1 + "\t" + line._2 + "\t" + line._3 + "\t" + line._4
       str
     }).saveAsTextFile(option.phiOutput)
 
@@ -347,8 +346,8 @@ object SparkLocalModel {
     //读取训练数据
     val trainDoc = sc.textFile(option.numerTrainFile).map(line => {
       val p = line.split("\t")
-      val z = new Array[Int](p.length - 1)
-      val l = new Array[Int](p.length - 1)
+      val z = new Array[Int](p.length - 2)
+      val l = new Array[Int](p.length - 2)
       var ll = 0
       var topic = 0
       val nd = Array[Int](1)
@@ -361,23 +360,23 @@ object SparkLocalModel {
           ndlz(i)(j) = 0
         }
       }
-      val sentTopicAssignArray = new Array[(Int, Int, Int)](p.length - 1)//(sent, topic, word)
-      for(i <- 1 until p.length){
+      val sentTopicAssignArray = new Array[(Int, Int, Int)](p.length - 2)//(sent, topic, word)
+      for(i <- 2 until p.length){
         val item = p(i).split(" ")
         if(item(1).toInt > -1 && item(1).toInt < option.nSentLabs){
           ll = item(1).toInt
         }else{
           ll = Random.nextInt(option.nSentLabs)
         }
-        l(i - 1) = ll
+        l(i - 2) = ll
         topic = Random.nextInt(option.kTopic)
-        z(i - 1) = topic
+        z(i - 2) = topic
         nd(0) += 1
         ndl(ll) += 1
         ndlz(ll)(topic) += 1
-        sentTopicAssignArray(i - 1) = (ll, topic, item(0).toInt)
+        sentTopicAssignArray(i - 2) = (ll, topic, item(0).toInt)
       }
-      (p(0), nd, ndl, ndlz, sentTopicAssignArray)
+      (p(1), nd, ndl, ndlz, sentTopicAssignArray, p(0))
     }).cache()
 
     //计算nlzw, nlz
@@ -390,7 +389,7 @@ object SparkLocalModel {
     execEstimate(sc, iterInputDocuments, nlzw, nlz)
   }
 
-  def main(args : Array[String]): Unit ={
+  def main(args : Array[String]): Unit = {
     //estimate
     initEstimate()
   }

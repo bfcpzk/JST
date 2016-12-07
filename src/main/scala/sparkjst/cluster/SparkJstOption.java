@@ -19,10 +19,10 @@ public class SparkJstOption implements Serializable{
     public double alpha = -1.0;
     public double beta = 0.01;
     public double gamma = -1.0;
-    public int maxIter = 50;
+    public int maxIter = 5;
     public boolean remote = true;
     public int nSentLabs = 3;
-    public int iterFlag = 5;
+    public int iterFlag = 6;
 
 
     public String piOutput = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/result/pi_dl";
