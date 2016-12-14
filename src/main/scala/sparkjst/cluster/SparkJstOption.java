@@ -22,7 +22,12 @@ public class SparkJstOption implements Serializable{
     public int maxIter = 5;
     public boolean remote = true;
     public int nSentLabs = 3;
-    public int iterFlag = 6;
+    public int iterFlag = 5;
+    public double phiCoeff = 0.0001;
+
+    public String tmp_piOutput = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/result/pi_dl";
+    public String tmp_thetaOutput = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/result/theta_dlz";
+    public String tmp_phiOutput = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/result/phi_lzw";
 
 
     public String piOutput = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/result/pi_dl";

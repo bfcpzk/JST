@@ -240,6 +240,7 @@ object SparkModel {
 
       //restart spark to optimize the memory
       if (iter % option.iterFlag == 0) {
+        saveResult(scc, iterTrainDoc, nlzw, nlz, option, c, iter)
         //save RDD temporally
         var pathDocument1=""
         var pathDocument2=""
@@ -251,10 +252,8 @@ object SparkModel {
           pathDocument2="gibbsLDAtmp2_" + iter
         }
         val storedDocuments1=iterTrainDoc
-        storedDocuments1.persist(StorageLevel.DISK_ONLY)
         storedDocuments1.saveAsObjectFile(pathDocument1)
         val storedDocuments2=updateDocuments
-        storedDocuments2.persist(StorageLevel.DISK_ONLY)
         storedDocuments2.saveAsObjectFile(pathDocument2)
 
         //restart Spark to solve the memory leak problem
@@ -268,7 +267,7 @@ object SparkModel {
     }
     //save result
     val resultDocuments = iterTrainDoc
-    saveResult(scc, resultDocuments, nlzw, nlz, option, c)
+    saveResult(scc, resultDocuments, nlzw, nlz, option, c, option.maxIter)
   }
 
   def saveResult(sc : SparkContext,
@@ -276,7 +275,22 @@ object SparkModel {
                  nlzw : Array[Array[Array[Int]]],
                  nlz : Array[Array[Int]],
                  option: SparkJstOption,
-                 c: Coefficient){
+                 c: Coefficient,
+                 iter: Int){
+
+    var piPath = ""
+    var thetaPath = ""
+    var phiPath = ""
+
+    if(iter < option.maxIter){
+      piPath = option.tmp_piOutput + "_" + iter
+      thetaPath = option.tmp_thetaOutput + "_" + iter
+      phiPath = option.tmp_phiOutput + "_" + iter
+    }else{
+      piPath = option.piOutput
+      thetaPath = option.thetaOutput
+      phiPath = option.phiOutput
+    }
 
     //move to memory
     resultDocuments.cache()
@@ -287,33 +301,29 @@ object SparkModel {
       for(l <- 0 until option.nSentLabs){
         pi_dl(l) = (doc._3(l) + c.gamma_dl(l))/(doc._2(0) + c.gammaSum_d(0))
       }
-      (doc._1, pi_dl)
+      (doc._1, doc._6, pi_dl)
     }).map(l => {
-      var str = l._1
+      var str = l._1 + "\t" + l._2
       for(t <- l._2){
         str += "\t" + t
       }
       str
-    }).saveAsTextFile(option.piOutput)
+    }).saveAsTextFile(piPath)
 
-    //save theta
     resultDocuments.flatMap( doc => {
-      val result = new Array[(String, Int, Array[Double])](option.nSentLabs)
+      var theta_dlz = new ArrayBuffer[(String, String, Int, Int, Double)]
       for(l <- 0 until option.nSentLabs){
-        val theta_dlz = new Array[Double](option.kTopic)
+        var result = 0.0
         for(z <- 0 until option.kTopic){
-          theta_dlz(z) = (doc._4(l)(z) + c.alpha_lz(l)(z))/(doc._3(l) + c.alphaSum_l(l))
+          result = (doc._4(l)(z) + c.alpha_lz(l)(z))/(doc._3(l) + c.alphaSum_l(l))
+            theta_dlz.+=((doc._1, doc._6, l, z, result))
         }
-        result(l) = (doc._1, l, theta_dlz)
       }
-      result
+      theta_dlz
     }).map(line => {
-      var str = line._1 + "\t" + line._2
-      for(t <- line._3){
-        str += "\t" + t
-      }
+      val str = line._1 + "\t" + line._2 + "\t" + line._3 + "\t" + line._4 + "\t" + line._5
       str
-    }).saveAsTextFile(option.thetaOutput)
+    }).saveAsTextFile(thetaPath)
 
     //save phi
     val phi_lzw = new ArrayBuffer[(Int, Int, Int, Double)]
@@ -322,7 +332,7 @@ object SparkModel {
         var wordSentTopic = 0.0
         for( w <- 0 until option.vocabSize){
           wordSentTopic = (nlzw(l)(z)(w) + c.beta_lzw(l)(z)(w)) / (nlz(l)(z) + c.betaSum_lz(l)(z))
-          if(wordSentTopic > 0.0001){
+          if(wordSentTopic > 0.00001){
             phi_lzw.+=((l, z, w, wordSentTopic))
           }
         }
@@ -331,10 +341,9 @@ object SparkModel {
     sc.parallelize(phi_lzw).map(line => {
       val str = line._1 + "\t" + line._2 + "\t" + line._3 + "\t" + line._4
       str
-    }).saveAsTextFile(option.phiOutput)
+    }).saveAsTextFile(phiPath)
 
   }
-
 
   def initEstimate(option: SparkJstOption, c: Coefficient): Unit ={
 
@@ -429,7 +438,7 @@ object SparkModel {
     //参数注入
     option.maxIter = args(0).toInt
     option.kTopic = args(1).toInt
-
+    option.phiCoeff = args(2).toDouble
     //program start
     initEstimate(option, coefficient)
   }

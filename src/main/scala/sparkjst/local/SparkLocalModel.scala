@@ -297,20 +297,17 @@ object SparkLocalModel {
 
     //save theta
     resultDocuments.flatMap( doc => {
-      val result = new Array[(String, String, Int, Array[Double])](option.nSentLabs)
+      var theta_dlz = new ArrayBuffer[(String, String, Int, Int, Double)]
       for(l <- 0 until option.nSentLabs){
-        val theta_dlz = new Array[Double](option.kTopic)
+        var result = 0.0
         for(z <- 0 until option.kTopic){
-          theta_dlz(z) = (doc._4(l)(z) + alpha_lz(l)(z))/(doc._3(l) + alphaSum_l(l))
+          result = (doc._4(l)(z) + alpha_lz(l)(z))/(doc._3(l) + alphaSum_l(l))
+            theta_dlz.+=((doc._1, doc._6, l, z, result))
         }
-        result(l) = (doc._1, doc._6, l, theta_dlz)
       }
-      result
+      theta_dlz
     }).map(line => {
-      var str = line._1 + "\t" + line._2 + "\t" + line._3
-      for(t <- line._4){
-        str += "\t" + t
-      }
+      val str = line._1 + "\t" + line._2 + "\t" + line._3 + "\t" + line._4 + "\t" + line._5
       str
     }).saveAsTextFile(option.thetaOutput)
 

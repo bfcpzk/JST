@@ -11,23 +11,23 @@
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="library" name="Maven: org.scala-lang:scala-library:2.10.4" level="project" />
-    <orderEntry type="library" name="Maven: org.kohsuke.args4j:args4j-maven-plugin:2.33" level="project" />
-    <orderEntry type="library" name="Maven: args4j:args4j-tools:all:2.33" level="project" />
-    <orderEntry type="library" name="Maven: args4j:args4j:2.33" level="project" />
-    <orderEntry type="library" name="Maven: org.apache.maven:maven-project:2.0.4" level="project" />
-    <orderEntry type="library" name="Maven: org.apache.maven:maven-settings:2.0.4" level="project" />
-    <orderEntry type="library" name="Maven: org.apache.maven:maven-profile:2.0.4" level="project" />
-    <orderEntry type="library" name="Maven: org.apache.maven:maven-model:2.0.4" level="project" />
-    <orderEntry type="library" name="Maven: org.apache.maven:maven-artifact-manager:2.0.4" level="project" />
-    <orderEntry type="library" name="Maven: org.apache.maven:maven-repository-metadata:2.0.4" level="project" />
-    <orderEntry type="library" name="Maven: org.apache.maven.wagon:wagon-provider-api:1.0-alpha-6" level="project" />
-    <orderEntry type="library" name="Maven: org.codehaus.plexus:plexus-utils:1.1" level="project" />
-    <orderEntry type="library" name="Maven: org.apache.maven:maven-artifact:2.0.4" level="project" />
-    <orderEntry type="library" name="Maven: org.codehaus.plexus:plexus-container-default:1.0-alpha-9" level="project" />
-    <orderEntry type="library" name="Maven: junit:junit:3.8.1" level="project" />
-    <orderEntry type="library" name="Maven: classworlds:classworlds:1.1-alpha-2" level="project" />
-    <orderEntry type="library" name="Maven: org.apache.maven:maven-plugin-api:2.0" level="project" />
-    <orderEntry type="library" name="Maven: net.sf.trove4j:trove4j:3.0.3" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: org.kohsuke.args4j:args4j-maven-plugin:2.33" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: args4j:args4j-tools:all:2.33" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: args4j:args4j:2.33" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: org.apache.maven:maven-project:2.0.4" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: org.apache.maven:maven-settings:2.0.4" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: org.apache.maven:maven-profile:2.0.4" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: org.apache.maven:maven-model:2.0.4" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: org.apache.maven:maven-artifact-manager:2.0.4" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: org.apache.maven:maven-repository-metadata:2.0.4" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: org.apache.maven.wagon:wagon-provider-api:1.0-alpha-6" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: org.codehaus.plexus:plexus-utils:1.1" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: org.apache.maven:maven-artifact:2.0.4" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: org.codehaus.plexus:plexus-container-default:1.0-alpha-9" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: junit:junit:3.8.1" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: classworlds:classworlds:1.1-alpha-2" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: org.apache.maven:maven-plugin-api:2.0" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: net.sf.trove4j:trove4j:3.0.3" level="project" />
     <orderEntry type="library" scope="PROVIDED" name="Maven: org.apache.spark:spark-core_2.10:1.6.1" level="project" />
     <orderEntry type="library" scope="PROVIDED" name="Maven: org.apache.avro:avro-mapred:hadoop2:1.7.7" level="project" />
     <orderEntry type="library" scope="PROVIDED" name="Maven: org.apache.avro:avro-ipc:1.7.7" level="project" />
@@ -159,6 +159,6 @@
     <orderEntry type="library" scope="PROVIDED" name="Maven: net.razorvine:pyrolite:4.9" level="project" />
     <orderEntry type="library" scope="PROVIDED" name="Maven: net.sf.py4j:py4j:0.9" level="project" />
     <orderEntry type="library" scope="PROVIDED" name="Maven: org.spark-project.spark:unused:1.0.0" level="project" />
-    <orderEntry type="library" name="Maven: com.hankcs:hanlp:portable-1.3.1" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: com.hankcs:hanlp:portable-1.3.1" level="project" />
   </component>
 </module>
