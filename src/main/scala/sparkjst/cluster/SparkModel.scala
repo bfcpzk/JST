@@ -419,6 +419,11 @@ object SparkModel {
 
     val option = new SparkJstOption
 
+    //参数注入
+    option.maxIter = args(0).toInt
+    option.kTopic = args(1).toInt
+    option.phiCoeff = args(2).toDouble
+
     val alpha_lz = Array.ofDim[Double](option.nSentLabs, option.kTopic)
 
     val alphaSum_l = new Array[Double](option.nSentLabs)
@@ -435,10 +440,6 @@ object SparkModel {
 
     val coefficient = Coefficient(alpha_lz, alphaSum_l, beta_lzw, betaSum_lz, lambda_lw, gamma_dl, gammaSum_d)
 
-    //参数注入
-    option.maxIter = args(0).toInt
-    option.kTopic = args(1).toInt
-    option.phiCoeff = args(2).toDouble
     //program start
     initEstimate(option, coefficient)
   }
