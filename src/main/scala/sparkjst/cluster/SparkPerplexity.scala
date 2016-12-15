@@ -20,7 +20,7 @@ object SparkPerplexity {
     sparkContext
   }
 
-  def calculatePerplexity(option: SparkJstOption, rate : Double, iter : Double): Double ={
+  def calculatePerplexity(option: SparkJstOption, rate : Double, iter : Int): Double ={
     val sc = startSpark(option.remote)
 
     var pathPi = ""
@@ -75,7 +75,7 @@ object SparkPerplexity {
     val temp = pi_theta_phi.map(l => l._2).sum()
     println(temp)
 
-    val res = pi_theta_phi.mapValues( l => Math.log(l)).map(l => l._2).sum()/option.numDocs
+    val res = Math.exp(- pi_theta_phi.mapValues( l => Math.log(l)).map(l => l._2).sum()/option.numDocs)
 
     //pi.unpersist(blocking = false)
     //theta.unpersist(blocking = false)
@@ -88,6 +88,7 @@ object SparkPerplexity {
     val rate = args(0).toDouble
     val iter = args(1).toInt
     val perplexity = calculatePerplexity(option, rate, iter)
-    println(perplexity)
+    println("iter : " + iter)
+    println("perplexity : " + perplexity)
   }
 }

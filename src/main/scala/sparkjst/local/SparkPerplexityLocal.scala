@@ -30,6 +30,13 @@ object SparkPerplexityLocal {
     }).collectAsMap//((sid, tid),(index, value))
     var phiMap = sc.broadcast(phi)
 
+    //读取pi
+    val pi = sc.textFile(option.piOutput).flatMap(l => {
+      val p = l.split("\t")
+      for(i <- 2 until p.length) yield ((p(0), (i-2).toString), p(i).toDouble)
+    })//((wid, sid), value)
+
+
     //读取theta
     val theta = sc.textFile(option.thetaOutput).map(l => {
       val p = l.split("\t")
@@ -44,12 +51,6 @@ object SparkPerplexityLocal {
       } yield ((value._1, key._1), (phi.get(key).getOrElse(("", 0.0))._1, phi.get(key).getOrElse(("",0.0))._2 * value._2))
     }).filter(l => !l._2._1.equals("")).collectAsMap//((wid, sid), (index, value))
     var tmp_phi_theta = sc.broadcast(phi_theta)
-
-    //读取pi
-    val pi = sc.textFile(option.piOutput).flatMap(l => {
-      val p = l.split("\t")
-      for(i <- 2 until p.length) yield ((p(0), (i-2).toString), p(i).toDouble)
-    })//((wid, sid), value)
 
     val pi_theta_phi = pi.mapPartitions( iter => {
       val phiTheta = tmp_phi_theta.value
