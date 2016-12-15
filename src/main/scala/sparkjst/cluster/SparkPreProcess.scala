@@ -38,23 +38,28 @@ object SparkPreProcess {
 
     //read sentiment dictionary and training corpus
     val trainFile = sc.textFile(option.trainFile).cache()
-    val docSize = trainFile.count.toInt
+    /*val docSize = trainFile.count.toInt
     val corpusSize = trainFile.filter(l => l.split("\t").length == 4).flatMap(l => {
       val p = l.split("\t")(3).split(" ")
       for(i <- 0 until p.length) yield ("word", 1)
-    }).reduceByKey(_+_).map(l => l._2).collect()(0)
+    }).reduceByKey(_+_).map(l => l._2).collect()(0)*/
 
     val allWords = trainFile.filter(l => l.split("\t").length == 4).flatMap(l => {
       val p = l.split("\t")(3).split(" ")
       for(i <- 0 until p.length) yield p(i)
     }).distinct.collect().toList.sortWith(_ < _)
+    val vSize = allWords.length
 
     //calculate the parameters
-    val avgDocSize = (corpusSize * 1.0)/docSize
+    /*val avgDocSize = (corpusSize * 1.0)/docSize
     val vSize = allWords.length
 
     //save the parameters
-    sc.parallelize(List(docSize + " " + vSize + " " + corpusSize + " " + avgDocSize), numSlices = 1).saveAsTextFile(option.dataCoeff)
+    println("docSize" + ":" + docSize)
+    println("vSize" + ":" + vSize)
+    println("corpusSize" + ":" + corpusSize)
+    println("avgDocSize" + ":" + avgDocSize)*/
+    //sc.parallelize(List(docSize + " " + vSize + " " + corpusSize + " " + avgDocSize), numSlices = 1).saveAsTextFile(option.dataCoeff)
 
     //create dictionary
     val wordIndexMap = new HashMap[String, Int]()

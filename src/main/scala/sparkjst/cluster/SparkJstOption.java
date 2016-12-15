@@ -7,7 +7,7 @@ import java.io.Serializable;
  */
 public class SparkJstOption implements Serializable{
 
-    public String trainFile = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/Divide.txt";
+    public String trainFile = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/newDivide.txt";
     public String sentDict = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/sentiNonDup.txt";
     public String numerTrainFile = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/pre/numerTrainFile";
     public String wordMap = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/pre/wordMap";
@@ -35,9 +35,9 @@ public class SparkJstOption implements Serializable{
     public String phiOutput = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/result/phi_lzw";
 
 
-    public int numDocs = 533961;
-    public int vocabSize = 339057;
-    public int corpusSize = 10994500;
-    public double aveDocLength = 20.590455108144603;
+    public int numDocs = 1024483;
+    public int vocabSize = 442067;
+    public int corpusSize = 20471070;
+    public double aveDocLength = 19.98185426210098;
 
 }
