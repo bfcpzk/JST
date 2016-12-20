@@ -1,7 +1,7 @@
 package sparkjst.cluster
 
+import org.apache.log4j.{Level, Logger}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.storage.StorageLevel
 import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.collection.mutable.ArrayBuffer
@@ -12,7 +12,7 @@ import scala.util.Random
   */
 object SparkModel {
 
-  def prior2beta(sc : SparkContext, option: SparkJstOption, c: Coefficient): Unit = {
+  def prior2beta(sc : SparkContext, option: SparkJstHongKongOption, c: Coefficient): Unit = {
     val indexSentPos = sc.textFile(option.indexSentPos).map(l => {
       val p = l.split("\t")
       (p(0).toInt, p(1).toInt)
@@ -37,7 +37,7 @@ object SparkModel {
     }
   }
 
-  def initCoff(sc : SparkContext, option : SparkJstOption, c : Coefficient): Coefficient = {
+  def initCoff(sc : SparkContext, option : SparkJstHongKongOption, c : Coefficient): Coefficient = {
 
     //处理alpha
     if (option.alpha <= 0) {
@@ -86,10 +86,10 @@ object SparkModel {
   }
 
   // 启动spark集群
-  def startSpark(remote: Boolean) = {
+  def startSpark(option: SparkJstHongKongOption) = {
     var scMaster = ""
-    if (remote) {
-      scMaster = "spark://202.112.113.199:7077" // e.g. 集群
+    if (option.remote) {
+      scMaster = option.scMaster // e.g. 集群
     } else {
       scMaster = "local[4]" // e.g. local[4]
     }
@@ -99,14 +99,14 @@ object SparkModel {
   }
 
   //重新启动spark集群
-  def restartSpark(sc: SparkContext, remote: Boolean): SparkContext = {
+  def restartSpark(sc: SparkContext, option : SparkJstHongKongOption): SparkContext = {
     // After iterations, Spark will create a lot of RDDs and I only have 4g mem for it.
     // So I have to restart the Spark. The thread.sleep is for the shutting down of Akka.
     sc.stop()
     Thread.sleep(2000)
     var scMaster = ""
-    if (remote) {
-      scMaster = "spark://202.112.113.199:7077" // e.g. 集群
+    if (option.remote) {
+      scMaster = option.scMaster // e.g. 集群
     } else {
       scMaster = "local[4]" // e.g. local[4]
     }
@@ -115,7 +115,7 @@ object SparkModel {
     sparkContext
   }
 
-  def updateNlzw(sentTopicTerm: List[((Int, Int, Int), Int)], option: SparkJstOption) = {
+  def updateNlzw(sentTopicTerm: List[((Int, Int, Int), Int)], option: SparkJstHongKongOption) = {
     val nlzw = Array.ofDim[Int](option.nSentLabs, option.kTopic, option.vocabSize)
     sentTopicTerm.foreach( t => {
       val sent = t._1._1
@@ -127,7 +127,7 @@ object SparkModel {
     nlzw
   }
 
-  def updateNlz(sentTopicTerm: List[((Int, Int, Int), Int)], option : SparkJstOption) = {
+  def updateNlz(sentTopicTerm: List[((Int, Int, Int), Int)], option : SparkJstHongKongOption) = {
     val nlz = Array.ofDim[Int](option.nSentLabs, option.kTopic)
     sentTopicTerm.foreach(t => {
       val sent = t._1._1
@@ -143,7 +143,7 @@ object SparkModel {
                     ndlz : Array[Array[Int]],
                     nlzw : Array[Array[Array[Int]]],
                     nlz : Array[Array[Int]],
-                    option : SparkJstOption,
+                    option : SparkJstHongKongOption,
                     c: Coefficient) = {
     for(t <- 0 until sentTopicAssignArray.length){
       var sentLab = sentTopicAssignArray(t)._1
@@ -212,7 +212,7 @@ object SparkModel {
                    iterInputDocuments : RDD[(String, Array[Int], Array[Int], Array[Array[Int]], Array[(Int, Int, Int)], String)],
                    nlzw : Array[Array[Array[Int]]],
                    nlz : Array[Array[Int]],
-                   option: SparkJstOption,
+                   option: SparkJstHongKongOption,
                    c: Coefficient): Unit ={
     var scc = sc
     var updateDocuments = iterInputDocuments
@@ -227,7 +227,9 @@ object SparkModel {
           (docId, new_nd, new_ndl, new_ndlz, newSentTopicAssignArray, userId)
       }
 
-      val sentTopicReduce = updateDocuments.flatMap(l => l._5).map(t => (t, 1)).reduceByKey(_+_).collect().toList
+      val sentTopicReduce = updateDocuments.flatMap(l => l._5).mapPartitions(iter => {
+        for( item <- iter) yield (item, 1)
+      }).reduceByKey(_+_).collect().toList
 
       //release resource
       iterTrainDoc.unpersist(blocking = false)
@@ -242,26 +244,17 @@ object SparkModel {
       if (iter % option.iterFlag == 0) {
         saveResult(scc, iterTrainDoc, nlzw, nlz, option, c, iter)
         //save RDD temporally
-        var pathDocument1=""
-        var pathDocument2=""
-        if(option.remote){
-          pathDocument1="hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/temp/gibbsLDAtmp_final_" + option.kTopic + "_" + iter
-          pathDocument2="hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/temp/gibbsLDAtmp2_final_" + option.kTopic + "_" + iter
-        }else{
-          pathDocument1="gibbsLDAtmp_" + iter
-          pathDocument2="gibbsLDAtmp2_" + iter
-        }
         val storedDocuments1=iterTrainDoc
-        storedDocuments1.saveAsObjectFile(pathDocument1)
+        storedDocuments1.saveAsObjectFile(option.pathDocument1 + option.kTopic + "_" + iter)
         val storedDocuments2=updateDocuments
-        storedDocuments2.saveAsObjectFile(pathDocument2)
+        storedDocuments2.saveAsObjectFile(option.pathDocument2 + option.kTopic + "_" + iter)
 
         //restart Spark to solve the memory leak problem
-        scc = restartSpark(scc, option.remote)
+        scc = restartSpark(scc, option)
         //as the restart of Spark, all of RDD are cleared
         //we need to read files in order to rebuild RDD
-        iterTrainDoc = scc.objectFile(pathDocument1)
-        updateDocuments = scc.objectFile(pathDocument2)
+        iterTrainDoc = scc.objectFile(option.pathDocument1 + option.kTopic + "_" + iter)
+        updateDocuments = scc.objectFile(option.pathDocument2 + option.kTopic + "_" + iter)
 
       }
     }
@@ -274,7 +267,7 @@ object SparkModel {
                  resultDocuments : RDD[(String, Array[Int], Array[Int], Array[Array[Int]], Array[(Int, Int, Int)], String)],
                  nlzw : Array[Array[Array[Int]]],
                  nlz : Array[Array[Int]],
-                 option: SparkJstOption,
+                 option: SparkJstHongKongOption,
                  c: Coefficient,
                  iter: Int){
 
@@ -345,11 +338,11 @@ object SparkModel {
 
   }
 
-  def initEstimate(option: SparkJstOption, c: Coefficient): Unit ={
+  def initEstimate(option: SparkJstHongKongOption, c: Coefficient): Unit ={
 
     //start spark
     System.setProperty("file.encoding", "UTF-8")
-    val sc = startSpark(option.remote)
+    val sc = startSpark(option)
 
     //init coeffcient
     val newCoeff = initCoff(sc, option, c)
@@ -392,7 +385,9 @@ object SparkModel {
     }).cache()
 
     //calculate nlzw, nlz
-    val sentTopicReduce = trainDoc.flatMap(l => l._5).map(t => (t, 1)).reduceByKey(_+_).collect().toList
+    val sentTopicReduce = trainDoc.flatMap(l => l._5).mapPartitions(iter => {
+      for( item <- iter) yield (item, 1)
+    }).reduceByKey(_+_).collect().toList
     val nlzw = updateNlzw(sentTopicReduce, option)
     val nlz = updateNlz(sentTopicReduce, option)
 
@@ -417,7 +412,11 @@ object SparkModel {
 
   def main(args : Array[String]): Unit ={
 
-    val option = new SparkJstOption
+    //屏蔽日志
+    Logger.getLogger("org.apache.spark").setLevel(Level.OFF)
+    Logger.getLogger("org.eclipse.jetty.server").setLevel(Level.OFF)
+
+    val option = new SparkJstHongKongOption
 
     //参数注入
     option.maxIter = args(0).toInt

@@ -9,10 +9,10 @@ import scala.collection.mutable.{ArrayBuffer, HashMap}
   */
 object SparkPreProcess {
   //start spark
-  def startSpark(remote: Boolean) = {
+  def startSpark(option : SparkJstHongKongOption) = {
     var scMaster = ""
-    if (remote) {
-      scMaster = "spark://202.112.113.199:7077" // e.g. 集群
+    if (option.remote) {
+      scMaster = option.scMaster // e.g. 集群
     } else {
       scMaster = "local[4]" // e.g. local[4]
     }
@@ -22,7 +22,7 @@ object SparkPreProcess {
   }
 
   //save (word, index) dictionary
-  def saveWordIndexMap( sc: SparkContext, wordMap : HashMap[String, Int], option: SparkJstOption): Unit ={
+  def saveWordIndexMap( sc: SparkContext, wordMap : HashMap[String, Int], option: SparkJstHongKongOption): Unit ={
     val wordArray = new ArrayBuffer[String]()
     for(item <- wordMap){
       wordArray.+=(item._2 + " " + item._1)
@@ -31,35 +31,34 @@ object SparkPreProcess {
   }
 
   //process
-  def jstFileProcess(option : SparkJstOption){
+  def jstFileProcess(option : SparkJstHongKongOption){
     //start spark
     System.setProperty("file.encoding", "UTF-8")
-    val sc = startSpark(option.remote)
+    val sc = startSpark(option)
 
     //read sentiment dictionary and training corpus
     val trainFile = sc.textFile(option.trainFile).cache()
-    /*val docSize = trainFile.count.toInt
+    val docSize = trainFile.count.toInt
     val corpusSize = trainFile.filter(l => l.split("\t").length == 4).flatMap(l => {
       val p = l.split("\t")(3).split(" ")
       for(i <- 0 until p.length) yield ("word", 1)
-    }).reduceByKey(_+_).map(l => l._2).collect()(0)*/
+    }).reduceByKey(_+_).map(l => l._2).collect()(0)
 
     val allWords = trainFile.filter(l => l.split("\t").length == 4).flatMap(l => {
       val p = l.split("\t")(3).split(" ")
       for(i <- 0 until p.length) yield p(i)
     }).distinct.collect().toList.sortWith(_ < _)
-    val vSize = allWords.length
 
     //calculate the parameters
-    /*val avgDocSize = (corpusSize * 1.0)/docSize
+    val avgDocSize = (corpusSize * 1.0)/docSize
     val vSize = allWords.length
 
     //save the parameters
     println("docSize" + ":" + docSize)
     println("vSize" + ":" + vSize)
     println("corpusSize" + ":" + corpusSize)
-    println("avgDocSize" + ":" + avgDocSize)*/
-    //sc.parallelize(List(docSize + " " + vSize + " " + corpusSize + " " + avgDocSize), numSlices = 1).saveAsTextFile(option.dataCoeff)
+    println("avgDocSize" + ":" + avgDocSize)
+    sc.parallelize(List(docSize + " " + vSize + " " + corpusSize + " " + avgDocSize), numSlices = 1).saveAsTextFile(option.dataCoeff)
 
     //create dictionary
     val wordIndexMap = new HashMap[String, Int]()
@@ -110,7 +109,7 @@ object SparkPreProcess {
   }
 
   def main(args : Array[String]): Unit ={
-    val option = new SparkJstOption
+    val option = new SparkJstHongKongOption
     jstFileProcess(option)
   }
 }

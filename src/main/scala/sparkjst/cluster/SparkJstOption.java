@@ -7,6 +7,9 @@ import java.io.Serializable;
  */
 public class SparkJstOption implements Serializable{
 
+    public String scMaster = "spark://202.112.113.199:7077";
+
+
     public String trainFile = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/newDivide.txt";
     public String sentDict = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/sentiNonDup.txt";
     public String numerTrainFile = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/pre/numerTrainFile";
@@ -28,6 +31,10 @@ public class SparkJstOption implements Serializable{
     public String tmp_piOutput = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/result/pi_dl";
     public String tmp_thetaOutput = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/result/theta_dlz";
     public String tmp_phiOutput = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/result/phi_lzw";
+
+    public String pathDocument1="hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/temp/gibbsLDAtmp_final_";
+    public String pathDocument2="hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/temp/gibbsLDAtmp2_final_";
+
 
 
     public String piOutput = "hdfs://202.112.113.199:9000/user/hduser/zhaokangpan/weibo/result/pi_dl";
