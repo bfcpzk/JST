@@ -20,8 +20,6 @@ object SparkPerplexity {
     sparkContext
   }
 
-  case class TT(kTopic : Int, kTable : Int)
-
   def calculatePerplexity(option: SparkJstHongKongOption, rate : Double, iter : Int): Double ={
     val sc = startSpark(option)
 
@@ -41,51 +39,50 @@ object SparkPerplexity {
     //读取phi
     val phi = sc.textFile(pathPhi).map(l => {
       val p = l.split("\t")
-      (p(0),(p(1), p(2), p(3).toDouble))
-    }).collectAsMap//(sid, (tid, index, value))
-    var phiMap = sc.broadcast(phi)
-
-    //读取pi
-    val pi = sc.textFile(pathPi).flatMap(l => {
-      val p = l.split("\t")
-      for(i <- 2 until p.length) yield ((i-2).toString, (p(0), p(i).toDouble))
-    })//(sid, (wid, value))
-
-    val phi_pi = pi.mapPartitions(iter => {
-      val phi = phiMap.value
-      for{
-        (key, value) <- iter
-        if(phi.contains(key))
-      } yield ((key, phi.get(key).getOrElse(("", "", 0.0))._1, value._1), (phi.get(key).getOrElse(("", "", 0.0))._2, phi.get(key).getOrElse(("", "", 0.0))._3 * value._2))
-    }).filter(l => (!l._2._1.equals("") && !l._1._2.equals("")))
-      .collectAsMap//((sid, tid, wid), (index, value))
-
-    val tmp_phi_pi = sc.broadcast(phi_pi)
+      ((p(1), p(0)), (p(2), p(3).toDouble))
+    }).collectAsMap//(tid, sid), (index, value))
+    val phiMap = sc.broadcast(phi)
 
     //读取theta
     val theta = sc.textFile(pathTheta).map(l => {
       val p = l.split("\t")
-      ((p(2), p(3), p(0)), p(4).toDouble)
-    }).filter( l => l._2 > rate)//((sid, tid, wid), value)
+      ((p(3), p(2)), (p(0), p(4).toDouble))
+    }).filter( l => l._2._2 > rate)//((tid, sid), (wid, value))
 
-    //全连接
-    val phi_pi_theta = theta.mapPartitions( iter => {
-      val phiPi = tmp_phi_pi.value
+    val phi_theta = theta.mapPartitions(iter => {
+      val phi = phiMap.value
       for{
         (key, value) <- iter
-        if(phiPi.contains(key))
-      } yield ((key._3, phiPi.get(key).getOrElse(("", 0.0))._1), phiPi.get(key).getOrElse(("", 0.0))._2 * value)
-    }).filter(l => !l._1._2.equals("")).reduceByKey(_+_).filter(l => l._2 > 0.0)//((wid, index), value) 对相同的(sid, tid)聚合相加
+        if(phi.contains(key))
+      } yield ((key._2, value._1, phi.get(key).getOrElse(("", 0.0))._1), phi.get(key).getOrElse(("", 0.0))._2 * value._2)
+    }).filter(l => !l._1._3.equals("") && l._2 > 0.0).reduceByKey(_+_).map(l => ((l._1._1, l._1._2), (l._1._3, l._2)))//((sid, wid), (index, value))
 
-    val temp = phi_pi_theta.map(l => l._2).sum()
-    println(temp)
+    //读取pi
+    val pi = sc.textFile(pathPi).flatMap(l => {
+      val p = l.split("\t")
+      for(i <- 2 until p.length) yield (((i-2).toString, p(0)), p(i).toDouble)
+    }).collectAsMap//(sid, wid), value)
+    val piMap = sc.broadcast(pi)
 
-    val res = Math.exp(- phi_pi_theta.mapValues( l => Math.log(l)).map(l => l._2).sum()/option.numDocs)
+    val pi_phi_theta = phi_theta.mapPartitions(iter => {
+      val pi = piMap.value
+      for{
+        (key, value) <- iter
+        if(pi.contains(key))
+      } yield ((key._2, value._1), pi.get(key).getOrElse(0.0) * value._2)
+    }).reduceByKey(_+_).filter(l => l._2 > 0.0) //((wid, index), value)
+
+    val temp = pi_phi_theta.mapValues( l => Math.log(l) ).map(l => l._2).sum()
+    println("指数分子：" + temp)
+    println("语料集单词数：" + option.corpusSize)
+    println("指数：" + temp * 1.0/option.corpusSize)
+
+    val res = Math.exp(- temp * 1.0/option.corpusSize)
 
     res
   }
 
-  def main(args : Array[String]): Unit ={
+  def main(args : Array[String]): Unit = {
     val option = new SparkJstHongKongOption
     val rate = args(0).toDouble
     val iter = args(1).toInt
