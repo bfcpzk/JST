@@ -43,6 +43,9 @@ object SparkPerplexity {
     }).collectAsMap//(tid, sid), (index, value))
     val phiMap = sc.broadcast(phi)
 
+    //phi文件长度
+    val phiLength = sc.textFile(pathPhi).count
+
     //读取theta
     val theta = sc.textFile(pathTheta).map(l => {
       val p = l.split("\t")
@@ -74,10 +77,10 @@ object SparkPerplexity {
 
     val temp = pi_phi_theta.mapValues( l => Math.log(l) ).map(l => l._2).sum()
     println("指数分子：" + temp)
-    println("语料集单词数：" + option.corpusSize)
-    println("指数：" + temp * 1.0/option.corpusSize)
+    println("语料集单词数：" + phiLength)
+    println("指数：" + temp * 1.0/phiLength)
 
-    val res = Math.exp(- temp * 1.0/option.corpusSize)
+    val res = Math.exp(- temp * 1.0/phiLength)
 
     res
   }
