@@ -25,6 +25,10 @@ public class SparkJstLocalOption implements Serializable{
     public String thetaOutput = "data/theta_dlz";
     public String phiOutput = "data/phi_lzw";
 
+    public String pML = "data/phi_zw";
+    public String queryExpansion = "data/queryExpansion";
+    public String relevanceOutput = "data/relevanceOutput";
+
     public String indexSentPos = "data/indexSentPos";
 
     public int numDocs = 520;

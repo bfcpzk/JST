@@ -76,11 +76,20 @@ object SparkPerplexity {
     }).reduceByKey(_+_).filter(l => l._2 > 0.0) //((wid, index), value)
 
     val temp = pi_phi_theta.mapValues( l => Math.log(l) ).map(l => l._2).sum()
-    println("指数分子：" + temp)
-    println("语料集单词数：" + phiLength)
-    println("指数：" + temp * 1.0/phiLength)
-
     val res = Math.exp(- temp * 1.0/phiLength)
+
+    println("numerator:" + temp)
+    println("phiLength:" + phiLength)
+    println("index_phi:" + temp * 1.0/phiLength)
+    println("perp_phi:" + Math.exp(- temp * 1.0/phiLength))
+
+    println("corpusSize:" + option.corpusSize)
+    println("index_corpusSize:" + temp * 1.0/option.corpusSize)
+    println("perp_corpusSize:" + Math.exp(- temp * 1.0/option.corpusSize))
+
+    println("numDocs" + option.numDocs)
+    println("index_numDocs:" + temp * 1.0/option.numDocs)
+    println("perp_numDocs:" + Math.exp(- temp * 1.0/option.numDocs))
 
     res
   }
@@ -91,6 +100,6 @@ object SparkPerplexity {
     val iter = args(1).toInt
     val perplexity = calculatePerplexity(option, rate, iter)
     println("iter : " + iter)
-    println("perplexity : " + perplexity)
+    //println("perplexity : " + perplexity)
   }
 }
